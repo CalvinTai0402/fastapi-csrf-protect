@@ -78,7 +78,7 @@ class CsrfProtect(CsrfConfig):
       token = header_parts[1]
     return token
 
-  def set_csrf_cookie(self, response: Optional[Response] = None) -> None:
+  def set_csrf_cookie(self, response: Optional[Response] = None) -> str:
     '''
     Sets Csrf Protection token to the response cookies
 
@@ -89,9 +89,10 @@ class CsrfProtect(CsrfConfig):
     if response and not isinstance(response,Response):
       raise TypeError('The response must be an object response FastAPI')
     response = response or self._response
+    value = self.generate_csrf(self._secret_key)
     response.set_cookie(
       self._cookie_key,
-      self.generate_csrf(self._secret_key),
+      value,
       max_age=self._max_age,
       path=self._cookie_path,
       domain=self._cookie_domain,
@@ -99,6 +100,8 @@ class CsrfProtect(CsrfConfig):
       httponly=self._httponly,
       samesite=self._cookie_samesite
     )
+    return value
+
 
   def unset_csrf_cookie(self, response: Optional[Response] = None) -> None:
     '''
@@ -116,8 +119,8 @@ class CsrfProtect(CsrfConfig):
       path=self._cookie_path,
       domain=self._cookie_domain
     )
-
-  def validate_csrf(self, data, secret_key: Optional[str] = None, time_limit: Optional[int] = None):
+    
+  def validate_csrf(self, data, request: Request, secret_key: Optional[str] = None, time_limit: Optional[int] = None):
     '''
     Check if the given data is a valid CSRF token. This compares the given
     signed token to the one stored in the session.
@@ -140,6 +143,10 @@ class CsrfProtect(CsrfConfig):
       raise TokenValidationError('The CSRF token is missing.')
     serializer = URLSafeTimedSerializer(secret_key, salt='fastapi-csrf-token')
     try:
+      cookie = request.cookies.get(self._cookie_key)
+      if cookie is None: raise MissingTokenError(f'Missing Cookie {self._cookie_key}')
+      if cookie != data:
+        raise TokenValidationError('The CSRF token is invalid.')
       token = serializer.loads(data, max_age=time_limit)
     except SignatureExpired:
       raise TokenValidationError('The CSRF token has expired.')
