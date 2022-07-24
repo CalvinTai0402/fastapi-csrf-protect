@@ -36,7 +36,7 @@ class LoadConfig(BaseModel):
 
   @validator('cookie_samesite', always=True)
   def validate_cookie_samesite(cls, value: str, values: dict):
-    if value not in { 'strict', 'lax', 'none' }:
+    if value not in { 'strict', 'lax', 'none', 'None'}:
       raise ValueError('The "cookie_samesite" must be between "strict", "lax", or "none".')
     elif value == 'none' and values.get('cookie_secure', False) is not True:
       raise ValueError('The "cookie_secure" must be True if "cookie_samesite" set to "none".')
